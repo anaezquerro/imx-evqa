@@ -47,7 +47,8 @@ class XVQASystem:
             with tqdm(total=len(train_dl), desc='train') as bar:
                 for words, imgs, answers in train_dl:
                     s_answer, mask = self.model(imgs, words) 
-                    loss = self.model.loss(s_answer, answers).to(self.device) + mask.mean().to(self.device) + self.weight_regularizer()
+                    active_ratio = mask.sum()/torch.prod(torch.tensor(mask.shape))
+                    loss = self.model.loss(s_answer, answers).to(self.device) + active_ratio.to(self.device)
                     optimizer.zero_grad()
                     loss.backward()
                     nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=max_norm, norm_type=2)
@@ -90,9 +91,7 @@ class XVQASystem:
         with open(f'{path}/params.pickle', 'wb') as writer:
             pickle.dump(params, writer)
         
-    def weight_regularizer(self):
-        return torch.norm(torch.cat([x.view(-1) for x in self.model.img_weights.parameters()]), 2)
-        
+
     
     @classmethod
     def build(
@@ -100,19 +99,23 @@ class XVQASystem:
         data: VQA,
         word_embed_size: int, 
         devices: Tuple[str,str],
-        img_size: Optional[Tuple[int, int]] = None 
+        img_size: Optional[Tuple[int, int]] = None,
+        max_targets: int = 200
     ) -> XVQASystem:
+        answer_tkz = Tokenizer('ANSWER', max_words=max_targets)
+        answer_tkz.train(*data.answers)
+        data = data.drop(answer_tkz)
         word_tkz = Tokenizer('WORD', lower=True)
         word_tkz.train(*data.words)
-        answer_tkz = Tokenizer('ANSWER')
-        answer_tkz.train(*data.answers)
         img_size = img_size if img_size is not None else XVQASystem.IMG_SIZE
         model = VQAModel(img_size, word_embed_size, len(word_tkz), word_tkz.pad_index, len(answer_tkz), devices)
         return XVQASystem(model, word_tkz, answer_tkz, img_size, devices[0])
         
         
 if __name__ == '__main__':
-    train = VQA.from_path('VQA2/train2014/', 'VQA2/train_questions.json', 'VQA2/train_annotations.json', max_images=int(1e4))
-    val = VQA.from_path('VQA2/val2014/', 'VQA2/val_questions.json', 'VQA2/val_annotations.json', max_images=int(2e2))
+    train = VQA.from_path('VQA2/train2014/', 'VQA2/train_questions.json', 'VQA2/train_annotations.json')
+    val = VQA.from_path('VQA2/val2014/', 'VQA2/val_questions.json', 'VQA2/val_annotations.json')
     system = XVQASystem.build(train, 200, ('cuda:0', 'cuda:1'))
+    train = train.drop(system.answer_tkz)
+    val = val.drop(system.answer_tkz)
     system.train(train, val, epochs=100, batch_size=30)

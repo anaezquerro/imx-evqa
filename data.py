@@ -2,6 +2,7 @@ from __future__ import annotations
 from torch.utils.data import Dataset 
 from typing import List, Optional, Set
 import os, json
+from tokenizer import Tokenizer 
 from fns import flatten
 
 class Instance:
@@ -33,8 +34,8 @@ class VQA(Dataset):
         return self.instances[index]
         
     @classmethod
-    def from_path(cls, img_folder: str, questions_path: str, annotations_path: str, max_images: int = int(1e3)) -> VQA:
-        instances = [Instance(img_folder + '/' + path) for path in os.listdir(img_folder)][:max_images]
+    def from_path(cls, img_folder: str, questions_path: str, annotations_path: str) -> VQA:
+        instances = [Instance(img_folder + '/' + path) for path in os.listdir(img_folder)]
         instances = {instance.ID: instance for instance in instances}
         with open(questions_path, 'r') as file:
             questions = json.load(file)
@@ -60,6 +61,13 @@ class VQA(Dataset):
     @property
     def answers(self) -> Set[str]:
         return set(instance.ANSWER for instance in self.instances)
+    
+    def __iter__(self):
+        return iter(self.instances)
+    
+    def drop(self, answer_tkz: Tokenizer) -> VQA:
+        return VQA([instance for instance in self.instances if answer_tkz[instance.ANSWER] != answer_tkz.unk_index])
+        
     
 if __name__ == '__main__':
     train = VQA.from_path('VQA2/train2014', 'VQA2/train_questions.json', 'VQA2/train_annotations.json')

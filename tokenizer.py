@@ -130,3 +130,9 @@ class Tokenizer:
     @property
     def special_indices(self) -> List[int]:
         return [self.vocab[token] for token in self.specials]
+    
+    def __getitem__(self, token: str):
+        try:
+            return self.vocab[self.preprocess(token)]
+        except KeyError:
+            return self.unk_index

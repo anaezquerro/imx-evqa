@@ -89,5 +89,13 @@ class OutConv(nn.Module):
         self.act = act
 
     def forward(self, x):
-        return self.act(self.conv(x))
+        x = self.conv(x)
+        return normalize(x)
+    
+
+
+def normalize(x: torch.Tensor):
+    minx = x.view(x.shape[0],-1).min(-1)[0].view(-1, 1, 1, 1)
+    maxx = x.view(x.shape[0],-1).max(-1)[0].view(-1, 1, 1, 1)
+    return (x-minx)/(maxx-minx)
     

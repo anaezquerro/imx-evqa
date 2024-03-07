@@ -2,8 +2,10 @@ from __future__ import annotations
 from torch.utils.data import Dataset 
 from typing import List, Optional, Set
 import os, json
+from random import shuffle
 from tokenizer import Tokenizer 
 from fns import flatten
+
 
 class Instance:
     def __init__(
@@ -65,8 +67,13 @@ class VQA(Dataset):
     def __iter__(self):
         return iter(self.instances)
     
-    def drop(self, answer_tkz: Tokenizer) -> VQA:
-        return VQA([instance for instance in self.instances if answer_tkz[instance.ANSWER] != answer_tkz.unk_index])
+    def drop(self, answer_tkz: Tokenizer, max_instances: Optional[int] = None) -> VQA:
+        instances = [instance for instance in self.instances if answer_tkz[instance.ANSWER] != answer_tkz.unk_index]
+        if max_instances is not None:
+            instances = instances[:max_instances]
+        return VQA(instances)
+            
+        
         
     
 if __name__ == '__main__':

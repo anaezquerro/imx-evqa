@@ -15,18 +15,18 @@ class ConditionedUNet(nn.Module):
         factor = 2 if bilinear else 1
         
         # encoder part 
-        self.inc = DoubleConv(n_channels, 32)
-        self.down1 = Down(32, 64)
-        self.down2 = Down(64, 128)
-        self.down3 = ConditionedDown(128, 256, word_embed_size)
-        self.down4 = ConditionedDown(256, 512 // factor, word_embed_size)
+        self.inc = DoubleConv(n_channels, 16)
+        self.down1 = Down(16, 32)
+        self.down2 = Down(32, 64)
+        self.down3 = ConditionedDown(64, 128, word_embed_size)
+        self.down4 = ConditionedDown(128, 256 // factor, word_embed_size)
         
-        # decoder         # decoder 
-        self.up1 = Up(512, 256 // factor, bilinear)
-        self.up2 = Up(256, 128 // factor, bilinear)
-        self.up3 = Up(128, 64 // factor, bilinear)
-        self.up4 = Up(64, 32, bilinear)
-        self.outc = OutConv(32)
+        # decoder        
+        self.up1 = Up(256, 128 // factor, bilinear)
+        self.up2 = Up(128, 64 // factor, bilinear)
+        self.up3 = Up(64, 32 // factor, bilinear)
+        self.up4 = Up(32, 16, bilinear)
+        self.outc = OutConv(16)
         
     def forward(self, imgs: torch.Tensor, words: torch.Tensor):
         x1 = self.inc(imgs)
@@ -41,6 +41,3 @@ class ConditionedUNet(nn.Module):
         logits = self.outc(x)
         return logits
     
-    
-if __name__ == '__main__':
-    unet = ConditionedUNet((320, 480), 3, 200)

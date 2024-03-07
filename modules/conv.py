@@ -3,6 +3,57 @@ import torch
 import torch.nn.functional as F
 
 
+class ConvBlock(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size=3),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(inplace=True),
+            nn.MaxPool2d(2)
+        )
+    
+    def forward(self, imgs: torch.Tensor) -> torch.Tensor:
+        return self.conv(imgs)
+    
+
+class ConditionedConvBlock(nn.Module):
+    BATCH_SIZE = 50
+    
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int, word_embed_size: int):
+        super().__init__()
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, kernel_size),
+            nn.BatchNorm2d(out_channels),
+            nn.LeakyReLU(inplace=True),
+            nn.MaxPool2d(2)
+        )
+        self.attn = nn.MultiheadAttention(out_channels, num_heads=1, batch_first=True, kdim=word_embed_size, vdim=word_embed_size)
+
+    
+    def forward(self, imgs: torch.Tensor, words: torch.Tensor) -> torch.Tensor:
+        feats = self.conv(imgs)
+        sizes = feats.shape[-2:]
+        feats = feats.flatten(-2, -1).permute(0, 2, 1)
+        feats = torch.concat([self.attn(feats[:, i:(i+self.BATCH_SIZE), :], words, words)[0] for i in range(0, feats.shape[1], self.BATCH_SIZE)], 1)
+        return feats.view(feats.shape[0], *sizes, feats.shape[-1]).permute(0, 3, 1, 2)
+
+
+
+class TransposedConvBlock(nn.Module):
+    """Upscaling then double conv"""
+
+    def __init__(self, in_channels: int, out_channels: int, kernel_size: int):
+        super().__init__()
+        self.up = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            nn.ConvTranspose2d(in_channels, out_channels, kernel_size),
+            nn.LeakyReLU(inplace=True)
+        )
+    
+    def forward(self, imgs: torch.Tensor) -> torch.Tensor:
+        return self.up(imgs)
+
 class DoubleConv(nn.Module):
     """(convolution => [BN] => ReLU) * 2"""
 

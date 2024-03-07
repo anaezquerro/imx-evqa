@@ -160,3 +160,4 @@ cython_debug/
 #.idea/
 VQA2/*
 *tar.gz
+easy-vqa/*

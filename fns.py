@@ -20,3 +20,10 @@ def to(device: str, *tensors):
         else:
             result.append(to(device, *x))
     return result 
+
+
+def normalize(imgs: torch.Tensor):
+    minx = imgs.view(imgs.shape[0], -1).min(-1)[0].view(-1, 1, 1, 1)
+    maxx = imgs.view(imgs.shape[0], -1).max(-1)[0].view(-1, 1, 1, 1)
+    return (imgs-minx)/(maxx-minx)
+    

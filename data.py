@@ -59,8 +59,8 @@ class VQA(Dataset):
         return set(flatten(instance.QUESTION.split() for instance in self.instances))
 
     @property
-    def answers(self) -> Set[str]:
-        return set(instance.ANSWER for instance in self.instances)
+    def answers(self) -> List[str]:
+        return [instance.ANSWER for instance in self.instances]
     
     def __iter__(self):
         return iter(self.instances)

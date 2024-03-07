@@ -55,9 +55,9 @@ class XVQASystem:
                     optimizer.step()
                     bar.update(1)
                     train_acc = ((s_answer.argmax(-1).to(self.device) == answers)*1.0).mean()*100
-                    bar.set_postfix({'loss': f'{loss.item():.2f}', 'train_acc': f'{train_acc:.2f}'})
+                    bar.set_postfix({'loss': f'{loss.item():.2f}', 'ratio': f'{active_ratio.item():.2f}', 'train_acc': f'{train_acc:.2f}'})
             acc = self.evaluate(val, batch_size)
-            print(f'Epoch {epoch+1}: loss={loss.item():.2f}, train_acc: {train_acc:.2f}, val_acc={acc:.2f}')
+            print(f'Epoch {epoch+1}: loss={loss.item():.2f}, ratio={active_ratio.item():.2f}, train_acc: {train_acc:.2f}, val_acc={acc:.2f}')
             
     @torch.no_grad()    
     def evaluate(

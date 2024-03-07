@@ -29,7 +29,7 @@ class VQAModel(nn.Module):
         weights = self.img_weights(imgs, word_embed)
         imgs, weights, word_embed = to(self.devices[1], imgs, weights, word_embed)
         img_embed = self.img_embed(imgs*weights, word_embed).flatten(1, 3)
-        return self.ffn(img_embed), weights.mean()
+        return self.ffn(img_embed), weights
     
     def loss(self, s_answer: torch.Tensor, answers: torch.Tensor):
         return self.criteria(s_answer, answers.to(self.devices[1]))

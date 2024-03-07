@@ -1,10 +1,8 @@
 
 from typing import Optional, List
-import torch 
+import torch, pickle
 from torch.nn.utils.rnn import pad_sequence
 
-BOS_TOKEN = '<bos>'
-EOS_TOKEN = '<eos>'
 
 class Tokenizer:
     EXTENSION = 'tkz'
@@ -16,22 +14,38 @@ class Tokenizer:
         field: str,
         pad_token: Optional[str] = '<pad>',
         unk_token: Optional[str] = '<unk>',
-        bos: bool = False,
-        eos: bool = False,
+        bos_token: Optional[str] = None,
+        eos_token: Optional[str] = None,
         lower: bool = False,
         max_words: Optional[int] = None
     ):
         self.field = field 
         self.pad_token = pad_token 
         self.unk_token = unk_token 
-        self.bos_token = BOS_TOKEN if bos else None 
-        self.eos_token = EOS_TOKEN if eos else None
+        self.bos_token = bos_token  
+        self.eos_token = eos_token 
         self.lower = lower
         self.max_words = max_words
         
         self.specials = [token for token in (pad_token, unk_token, self.bos_token, self.eos_token) if isinstance(token, str)]
         self.counter = dict()
         self.reset()
+        
+    def save(self, path: str):
+        data = {param: getattr(self, param) for param in self.PARAMS}
+        with open(path, 'wb') as writer:
+            pickle.dump(data, writer)
+    
+    @classmethod
+    def load(cls, path: str):
+        with open(path, 'rb') as reader:
+            data = pickle.load(reader)
+        counter = data.pop('counter')
+        tkz = cls(**data)
+        tkz.counter = counter 
+        tkz.load_counter()
+        return tkz 
+        
         
     def reset(self):
         self.vocab = {token: i for i, token in enumerate(self.specials)}
@@ -61,6 +75,9 @@ class Tokenizer:
         self.reset()
         for token in tokens:
             self.count(self.preprocess(token))
+        self.load_counter()
+    
+    def load_counter(self):
         tokens = self.counter.keys() if self.max_words is None else \
             sorted(self.counter.keys(), key=self.counter.get, reverse=True)[:self.max_words]
         for token in tokens:

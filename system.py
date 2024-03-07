@@ -1,5 +1,5 @@
 from __future__ import annotations
-import torch, cv2
+import torch, cv2, pickle
 from torch import nn 
 from data import VQA, Instance
 from typing import Tuple, List, Optional
@@ -10,10 +10,11 @@ from fns import to
 from torch.utils.data import DataLoader
 from tqdm import tqdm 
 from torchvision.transforms import Resize
-from torch.optim import AdamW
+from torch.optim import AdamW, Optimizer
 
 class XVQASystem:
     IMG_SIZE = (320, 480)
+    PARAMS = ['img_size']
     
     def __init__(
         self, 
@@ -36,7 +37,7 @@ class XVQASystem:
         val: VQA,
         epochs: int,
         batch_size: int,
-        lr: float = 1e-4,
+        lr: float = 1e-3,
         max_norm: float = 5.0
     ):
         train_dl = DataLoader(train, batch_size=batch_size, collate_fn=self.transform, shuffle=True)
@@ -45,16 +46,17 @@ class XVQASystem:
         for epoch in range(epochs):
             with tqdm(total=len(train_dl), desc='train') as bar:
                 for words, imgs, answers in train_dl:
-                    s_answer, mask = self.model(imgs, words)
-                    loss = self.model.loss(s_answer, answers) + mask.mean()
+                    s_answer, mask = self.model(imgs, words) 
+                    loss = self.model.loss(s_answer, answers).to(self.device) + mask.mean().to(self.device) + self.weight_regularizer()
                     optimizer.zero_grad()
                     loss.backward()
                     nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=max_norm, norm_type=2)
                     optimizer.step()
                     bar.update(1)
-                    bar.set_postfix({'loss': f'{loss.item():.2f}'})
+                    train_acc = ((s_answer.argmax(-1).to(self.device) == answers)*1.0).mean()*100
+                    bar.set_postfix({'loss': f'{loss.item():.2f}', 'train_acc': f'{train_acc:.2f}'})
             acc = self.evaluate(val, batch_size)
-            print(f'Epoch {epoch+1}: loss={loss.item():.2f}, acc={acc:.2f}')
+            print(f'Epoch {epoch+1}: loss={loss.item():.2f}, train_acc: {train_acc:.2f}, val_acc={acc:.2f}')
             
     @torch.no_grad()    
     def evaluate(
@@ -66,8 +68,9 @@ class XVQASystem:
         acc = 0
         for words, imgs, answers in tqdm(val_dl, total=len(val_dl), desc='eval'):
             s_answer, _ = self.model(imgs, words)
-            acc += ((s_answer.argmax(-1).to(self.device) == answers)*1.0).sum()
-        return float(acc/len(val_dl))
+            acc += (s_answer.argmax(-1).to(self.device) == answers).sum()
+        return float(acc/len(val))*100
+    
             
 
     def transform(self, batch: List[Instance]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -75,6 +78,21 @@ class XVQASystem:
         answers = self.answer_tkz.encode([instance.ANSWER for instance in batch])
         imgs = torch.stack([self.resize(torch.tensor(cv2.imread(instance.IMG_PATH)).permute(2, 0, 1)) for instance in batch], 0)/255
         return to(self.device, questions, imgs, answers)
+    
+    
+    def save_model(self, path: str, optimizer: Optimizer):
+        torch.save({'model': self.model.state_dict(), 'optimizer': optimizer.state_dict()}, path)
+        
+    def save(self, path: str):
+        self.word_tkz.save(f'{path}/{self.word_tkz.field}.tkz')
+        self.answer_tkz.save(f'{path}/{self.answer_tkz.field}.tkz')
+        params = {param: getattr(self, param) for param in self.PARAMS}
+        with open(f'{path}/params.pickle', 'wb') as writer:
+            pickle.dump(params, writer)
+        
+    def weight_regularizer(self):
+        return torch.norm(torch.cat([x.view(-1) for x in self.model.img_weights.parameters()]), 2)
+        
     
     @classmethod
     def build(
@@ -95,6 +113,6 @@ class XVQASystem:
         
 if __name__ == '__main__':
     train = VQA.from_path('VQA2/train2014/', 'VQA2/train_questions.json', 'VQA2/train_annotations.json', max_images=int(1e4))
-    val = VQA.from_path('VQA2/val2014/', 'VQA2/val_questions.json', 'VQA2/val_annotations.json', max_images=int(1e3))
+    val = VQA.from_path('VQA2/val2014/', 'VQA2/val_questions.json', 'VQA2/val_annotations.json', max_images=int(2e2))
     system = XVQASystem.build(train, 200, ('cuda:0', 'cuda:1'))
     system.train(train, val, epochs=100, batch_size=30)

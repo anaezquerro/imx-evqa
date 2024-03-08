@@ -8,9 +8,9 @@ class Encoder(nn.Module):
         self.n_channels = n_channels
         self.bilinear = bilinear
 
-        self.down1 = ConditionedDown(n_channels, 32, word_embed_size)
-        self.down2 = ConditionedDown(32, 32, word_embed_size)
-        self.down3 = ConditionedDown(32, 32, word_embed_size)
+        self.down1 = ConditionedConvBlock(n_channels, 64, 11, word_embed_size)
+        self.down2 = ConditionedConvBlock(64, 128, 7, word_embed_size)
+        self.down3 = ConditionedConvBlock(128, 256, 5, word_embed_size)
         
         words = torch.empty(1, 10, word_embed_size)
         imgs = torch.empty(1, n_channels, *img_sizes)

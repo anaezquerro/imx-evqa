@@ -1,6 +1,7 @@
 
 from typing import Optional, List
 import torch, pickle
+import numpy as np 
 from torch.nn.utils.rnn import pad_sequence
 
 
@@ -136,3 +137,13 @@ class Tokenizer:
             return self.vocab[self.preprocess(token)]
         except KeyError:
             return self.unk_index
+        
+    @property 
+    def weights(self) -> torch.Tensor:
+        total = sum(self.counter.values())
+        weights = [
+            1/np.sqrt(total/self.counter[token]) if token not in self.specials else (total-1)/total
+            for token in sorted(self.vocab.keys(), key=self.vocab.get)
+        ]
+        return torch.tensor(weights).to(torch.float32)
+        

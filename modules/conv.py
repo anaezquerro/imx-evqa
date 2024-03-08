@@ -1,6 +1,7 @@
 from torch import nn 
 import torch 
 import torch.nn.functional as F
+from modules.ffn import FFN 
 
 
 class ConvBlock(nn.Module):
@@ -28,17 +29,43 @@ class ConditionedConvBlock(nn.Module):
             nn.LeakyReLU(inplace=True),
             nn.MaxPool2d(2)
         )
-        self.attn = nn.MultiheadAttention(out_channels, num_heads=1, batch_first=True, kdim=word_embed_size, vdim=word_embed_size)
+        self.attn = nn.MultiheadAttention(in_channels, num_heads=1, batch_first=True, kdim=word_embed_size, vdim=word_embed_size)
 
     
     def forward(self, imgs: torch.Tensor, words: torch.Tensor) -> torch.Tensor:
-        feats = self.conv(imgs)
-        sizes = feats.shape[-2:]
-        feats = feats.flatten(-2, -1).permute(0, 2, 1)
+        sizes = imgs.shape[-2:]
+        feats = imgs.flatten(-2, -1).permute(0, 2, 1)
         feats = torch.concat([self.attn(feats[:, i:(i+self.BATCH_SIZE), :], words, words)[0] for i in range(0, feats.shape[1], self.BATCH_SIZE)], 1)
-        return feats.view(feats.shape[0], *sizes, feats.shape[-1]).permute(0, 3, 1, 2)
+        feats = feats.view(feats.shape[0], *sizes, feats.shape[-1]).permute(0, 3, 1, 2)
+        feats = self.conv(feats)
+        return feats
 
 
+# class ConditionedConvBlock(nn.Module):
+    
+#     def __init__(self, in_channels: int, out_channels: int, kernel_size: int, word_embed_size: int):
+#         super().__init__()
+#         self.conv = nn.Sequential(
+#             nn.Conv2d(in_channels, out_channels, kernel_size),
+#             nn.BatchNorm2d(out_channels),
+#             nn.LeakyReLU(inplace=True),
+#             nn.MaxPool2d(2)
+#         )
+#         self.ffn = None
+#         self.word_embed_size = word_embed_size
+
+    
+#     def forward(self, imgs: torch.Tensor, words: torch.Tensor) -> torch.Tensor:
+#         sizes = imgs.shape[-2:]
+#         if self.ffn is None:
+#             self.ffn = FFN(sizes[0]*sizes[1]+self.word_embed_size, sizes[0]*sizes[1])
+#         self.ffn = self.ffn.to(imgs.device)
+             
+#         # join imgs and words informations 
+#         condition = torch.concat([imgs.flatten(-2, -1), words.unsqueeze(1).repeat(1, imgs.shape[1], 1)], -1)
+#         feats = self.ffn(condition).view(imgs.shape[0], -1, sizes[0], sizes[1])
+#         feats = self.conv(feats)
+#         return feats
 
 class TransposedConvBlock(nn.Module):
     """Upscaling then double conv"""

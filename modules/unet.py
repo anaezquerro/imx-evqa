@@ -11,18 +11,23 @@ class ConditionedUNet(nn.Module):
         super().__init__()
         self.n_channels = n_channels
         
-        self.enc1 = ConditionedConvBlock(n_channels, 16, 3, word_embed_size)
-        self.enc2 = ConditionedConvBlock(16, 32, 3, word_embed_size)
+        self.enc1 = ConditionedConvBlock(n_channels, 64, 11, word_embed_size)
+        self.enc2 = ConditionedConvBlock(64, 128, 7, word_embed_size)
+        self.enc3 = ConditionedConvBlock(128, 128, 5, word_embed_size)
+
         
-        self.dec1 = TransposedConvBlock(32, 16, 4)
-        self.dec2 = TransposedConvBlock(16, 1, 3)
+        self.dec1 = TransposedConvBlock(128, 128, 5)
+        self.dec2 = TransposedConvBlock(128*2, 64, 8)
+        self.dec3 = TransposedConvBlock(64*2, 1, 11)
         
     def forward(self, imgs: torch.Tensor, words: torch.Tensor):
-        x = self.enc1(imgs, words)
-        h = self.enc2(x, words)
-        h1 = self.dec1(h)
-        h2 = self.dec2(h1)
-        return normalize(h2)
+        x1 = self.enc1(imgs, words)
+        x2 = self.enc2(x1, words)
+        x3 = self.enc3(x2, words)
+        h1 = self.dec1(x3)
+        h2 = self.dec2(torch.concat([h1, x2], 1))
+        h3 = self.dec3(torch.concat([h2, x1], 1))
+        return h3
     
     
     

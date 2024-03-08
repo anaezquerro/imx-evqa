@@ -25,9 +25,11 @@ class LSTM(nn.Module):
         self.reset_parameters()
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        _, (h, _) = self.lstm(x)
-        y = self.ffn(h)
-        return y
+        h, (hn, _) = self.lstm(x)
+        if self.bidirectional:
+            hn = self.ffn(hn.permute(1, 2, 0).flatten(-2, -1))
+        h = self.ffn(h)
+        return h, hn
 
 
     def reset_parameters(self):

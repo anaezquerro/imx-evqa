@@ -1,4 +1,4 @@
-from typing import Iterator
+from typing import Iterator, Set
 import torch 
 
 def flatten(*lists) -> list:
@@ -9,6 +9,24 @@ def flatten(*lists) -> list:
         else:
             result.append(item)
     return result 
+
+
+def fscore(pred: torch.Tensor, gold: torch.Tensor, binary: bool = True, exclude: Set[int] = set()):
+    if binary:
+        tp = (pred.flatten().to(torch.bool) & gold.flatten().to(torch.bool)).sum()
+        prec, rec = tp/pred.sum(), tp/gold.sum()
+        return (2*prec*rec)/(prec+rec+1e-12)
+    else:
+        classes = set(gold.unique().tolist()) - exclude
+        fs = 0
+        for c in classes:
+            tp = ((pred.flatten() == c) & (gold.flatten() == c)).sum()
+            prec, rec = tp/((pred.flatten() == c).sum() + 1e-12), tp/(gold.flatten() == c).sum()
+            fs += (2*prec*rec)/(prec+rec+1e-12)
+        fs /= (len(classes)+1e-12)
+        return fs 
+
+
 
 
 

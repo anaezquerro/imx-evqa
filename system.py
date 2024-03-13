@@ -1,12 +1,10 @@
 from __future__ import annotations
 import torch, cv2, pickle, shutil, os
 from torch import nn 
-from easy import EasyVQA, Instance
 from typing import Tuple, List, Dict
 from model import VQAModel
-from tokenizer import Tokenizer
+from utils import Tokenizer, to, fscore, EasyVQA, Instance
 from transformers import AutoImageProcessor
-from fns import to, fscore
 from torch.utils.data import DataLoader
 from tqdm import tqdm 
 from torchvision.transforms import Compose, GaussianBlur, RandomHorizontalFlip, RandomVerticalFlip
@@ -181,5 +179,5 @@ class XVQASystem:
 if __name__ == '__main__':
     train = EasyVQA.from_path('easy-vqa/train/images/', 'easy-vqa/train/questions.json')
     val = EasyVQA.from_path('easy-vqa/test/images/', 'easy-vqa/test/questions.json')
-    system = XVQASystem.build(train, 200, device='cuda:0')
+    system = XVQASystem.build(train, word_embed_size=200, device='cuda:0')
     system.train(train, val, 'results/', epochs=500, batch_size=500)
